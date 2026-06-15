@@ -33,3 +33,4 @@ for run_id in df["run_id"].unique():
     plt.tight_layout()
     plt.savefig(GRAPHS_PATH / f"opinion_clusters_{run_id}.png", dpi=300)
     plt.show()
+
