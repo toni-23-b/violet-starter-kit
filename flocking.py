@@ -1,30 +1,45 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-import random
 
 import polars as pl
 import matplotlib.pyplot as plt
 
 from vi import Agent, Simulation
 from vi.config import Config
+from distribution_v import SEEDS, five_distributions
 
 DATA_PATH = Path("data.csv")
-RESULTS_PATH = Path("results_0.05.csv")
+RESULTS_PATH = Path("results.csv")
 DATA_PATH.unlink(missing_ok=True)
 
 @dataclass
 class OpinionConfig(Config):
     epsilon: float = 0.05
     convergence_tolerance: float = 0.001
+    initial_opinions: list[float] = field(default_factory=list)
 
-def truncated_normal(mean, sd, lower=0.0, upper=1.0):
-    value = random.gauss(mean, sd)
 
-    while value < lower or value > upper:
-        value = random.gauss(mean, sd)
+class OpinionAgent(Agent[OpinionConfig]):
+    def update(self):
+        self.save_data("opinion", self.opinion)
+        self.save_data("agent_type", type(self).__name__)
 
-    return value
+
+class OpinionHolder(OpinionAgent):
+    def on_spawn(self):
+        self.opinion = self.config.initial_opinions[self.id]
+
+
+class ExtremistYes(OpinionAgent):
+    def on_spawn(self):
+        self.opinion = 1.0
+
+
+class ExtremistNo(OpinionAgent):
+    def on_spawn(self):
+        self.opinion = 0.0
+
 
 def stepHK(agents, epsilon):
     next_opinions = []
@@ -51,26 +66,6 @@ def count_clusters(opinions, epsilon):
 
     return clusters
 
-class OpinionAgent(Agent[OpinionConfig]):
-    def update(self):
-        self.save_data("opinion", self.opinion)
-        #self.save_data("next_opinion", self.next_opinion)
-        self.save_data("agent_type", type(self).__name__)
-
-
-class OpinionHolder(OpinionAgent):
-    def on_spawn(self):
-        self.opinion = truncated_normal(mean=0.5, sd=0.15)
-
-
-class ExtremistYes(OpinionAgent):
-    def on_spawn(self):
-        self.opinion = 1.0
-
-
-class ExtremistNo(OpinionAgent):
-    def on_spawn(self):
-        self.opinion = 0.0
 
 
 class HKSimulation(Simulation[OpinionConfig]):
@@ -91,17 +86,24 @@ class HKSimulation(Simulation[OpinionConfig]):
         if max_change < self.config.convergence_tolerance:
             self.stop()
     
-run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-seed = [1,2,3,4,5]
 total_agents = 1000
-extremist_proportion = 0.0
+extremist_proportion = 1.0
 extremist_count = int(total_agents * extremist_proportion)
 normal_count = total_agents - extremist_count
 yes_count = extremist_count // 2
 no_count = extremist_count - yes_count
 
-for i in seed:
-    config = OpinionConfig(image_rotation=True, movement_speed=1, radius=50, epsilon=0.05, convergence_tolerance=0.001, seed=i)
+for seed in SEEDS:
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    config = OpinionConfig(
+        image_rotation=True,
+        movement_speed=1,
+        radius=50,
+        epsilon=0.05,
+        convergence_tolerance=0.001,
+        seed=seed,
+        initial_opinions=five_distributions[seed],
+    )
 
     sim = (
         # Step 1: Create a new simulation.
@@ -116,7 +118,7 @@ for i in seed:
 
     run_data = sim.snapshots.with_columns(
         pl.lit(run_id).alias("run_id"),
-        pl.lit(i).alias("seed"),
+        pl.lit(seed).alias("seed"),
         pl.lit(config.epsilon).alias("epsilon"),
         pl.lit(config.radius).alias("radius"),
         pl.lit(total_agents).alias("total_agents"),
@@ -131,7 +133,7 @@ for i in seed:
     results_data = pl.DataFrame(
         {
             "run_id": [run_id],
-            "seed": [i],
+            "seed": [seed],
             "number_of_clusters": [count_clusters(final_opinions, config.epsilon)],
             "number_of_extremists": [extremist_count],
         }
@@ -141,12 +143,12 @@ for i in seed:
     with RESULTS_PATH.open("a", newline="") as file:
         results_data.write_csv(file, include_header=include_header)
 
-    GRAPHS_PATH = Path("graphs_0.05")
+    GRAPHS_PATH = Path("graphs")
     GRAPHS_PATH.mkdir(exist_ok=True)
 
     df = pl.read_csv("data.csv")
 
-    run_data = df.filter(pl.col("seed") == i)
+    run_data = df.filter(pl.col("seed") == seed)
 
     plt.figure(figsize=(10, 6))
 
@@ -168,6 +170,5 @@ for i in seed:
     plt.grid(alpha=0.25)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(GRAPHS_PATH / f"opinion_clusters_{extremist_count}_{i}.png", dpi=300)
+    plt.savefig(GRAPHS_PATH / f"opinion_clusters_{extremist_count}_{seed}.png", dpi=300)
     plt.show()
-
