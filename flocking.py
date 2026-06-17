@@ -89,7 +89,7 @@ class HKSimulation(Simulation[OpinionConfig]):
             self.stop()
     
 total_agents = 1000
-extremist_proportion = 1.0
+extremist_proportion = 0.1
 extremist_count = int(total_agents * extremist_proportion)
 normal_count = total_agents - extremist_count
 yes_count = extremist_count // 2
