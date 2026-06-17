@@ -9,8 +9,10 @@ from vi import Agent, Simulation
 from vi.config import Config
 from distribution_v import SEEDS, five_distributions
 
+
 DATA_PATH = Path("data.csv")
 RESULTS_PATH = Path("results.csv")
+
 DATA_PATH.unlink(missing_ok=True)
 
 @dataclass
