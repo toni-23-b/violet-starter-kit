@@ -3,4 +3,8 @@ name = "pci-2025"
 version = "0.1.0"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["violet-simulator>=0.3.0"]
+dependencies = [
+    "matplotlib>=3.11.0",
+    "scipy>=1.17.1",
+    "violet-simulator>=0.3.0",
+]
